@@ -14,7 +14,6 @@ include("TOML/print.jl")
 include("TOML/TOML.jl")
 include("TOML/parser.jl")
 
-
 abstract type MCMCSampler end
 
 """
@@ -105,24 +104,11 @@ Runs the benchmarking procedure and returns the results
 """
  function benchmark(samplers,simulate,Nreps,chains=();kwargs...)
      results = DataFrame()
+     compile(samplers,simulate;kwargs...)
      for p in Permutation(kwargs)
          benchmark!(samplers,results,simulate,Nreps,chains;p...)
      end
      return results
- end
-
- """
- Runs the benchmarking procedure defined in benchmark in parallel and returns the results
-
- * `samplers`: a tuple of samplers or a single sampler object
- * `simulate`: model simulation function with keyword Nd
- * `Nreps`: number of times the benchmark is repeated for each factor combination
- """
- function pbenchmark(samplers,simulate,Nreps;kwargs...)
-     pfun(rep) = benchmark(samplers,simulate,rep,chains;kwargs...)
-     reps = setreps(Nreps)
-     presults = pmap(rep->pfun(rep),reps)
-     return vcat(presults...)
  end
 
 """
@@ -131,12 +117,14 @@ parameter estimation
 * 's': sampler object
 * `data': data for benchmarking
 """
-function runSampler(s::AHMCNUTS,data;kwargs...)
-    return sample(s.model(data...),s.config)
+function runSampler(s::AHMCNUTS,data;Nchains,kwargs...)
+    chains = pmap(x->sample(s.model(data...),s.config),1:Nchains)
+    return reduce(chainscat,chains)
 end
 
-function runSampler(s::DNNUTS,data;kwargs...)
-    return sample(s.model(data...),s.config)
+function runSampler(s::DNNUTS,data;Nchains,kwargs...)
+    chains = pmap(x->sample(s.model(data...),s.config),1:Nchains)
+    return reduce(chainscat,chains)
 end
 
 function runSampler(s::CmdStanNUTS,data;kwargs...)
@@ -144,8 +132,9 @@ function runSampler(s::CmdStanNUTS,data;kwargs...)
     return chns
 end
 
-function runSampler(s::DHMCNUTS,data;kwargs...)
-    return s.model(data...,s.Nsamples)
+function runSampler(s::DHMCNUTS,data;Nchains,kwargs...)
+    chains = pmap(x->s.model(data...,s.Nsamples),1:Nchains)
+    return reduce(chainscat,chains)
 end
 
 """
@@ -247,7 +236,7 @@ Adds performance metrics to benchmark results
 """
 function addPerformance!(df,p)
     df[:time] = p[2]
-    df[:megabytes] = p[3]/10e6
+    df[:megabytes] = p[3]/1e6
     df[:gctime] = p[4]
     df[:gcpercent] = p[4]/p[2]
     df[:allocations] = p[5].poolalloc + p[5].malloc
@@ -261,10 +250,12 @@ function modifyConfig!(s::AHMCNUTS;Nsamples,Nadapt,delta,kwargs...)
     s.config = Turing.NUTS(Nsamples,Nadapt,delta)
 end
 
-function modifyConfig!(s::CmdStanNUTS;Nsamples,Nadapt,delta,kwargs...)
+function modifyConfig!(s::CmdStanNUTS;Nchains,Nsamples,Nadapt,delta,kwargs...)
     s.model.num_samples = Nsamples-Nadapt
     s.model.num_warmup = Nadapt
     s.model.method.adapt.delta = delta
+    s.model.nchains = Nchains
+    s.model.command = fill(``, Nchains)
     id = myid()
     if id != 1
         s.model.name = string(s.name,id)
@@ -390,7 +381,6 @@ export
   removeBurnin,
   toDict,
   addKW!,
-  initStan,
   setreps,
   compileStanModel,
   addPerformance!,
@@ -398,7 +388,6 @@ export
   runSampler,
   benchmark!,
   benchmark,
-  pbenchmark,
   MCMCSampler,
   AHMCNUTS,
   CmdStanNUTS,
@@ -407,6 +396,7 @@ export
   plotdensity,
   plotsummary,
   plotscatter,
+  plotrecovery,
   nptochain,
   setprocs,
   save,
