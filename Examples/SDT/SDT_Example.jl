@@ -5,6 +5,9 @@ setprocs(Nchains)
 ProjDir = @__DIR__
 cd(ProjDir)
 
+isdir("tmp") && rm("tmp", recursive=true)
+mkdir("tmp")
+!isdir("results") && mkdir("results")
 path = pathof(MCMCBenchmarks)
 @everywhere begin
   using MCMCBenchmarks
@@ -14,6 +17,7 @@ path = pathof(MCMCBenchmarks)
   include(joinpath($path, "../../Models/SDT/SDT_Functions.jl"))
 end
 include(joinpath(path, "../../Models/SDT/SDT.jl"))
+include(joinpath(path, "../../Models/SDT/SDT_Functions.jl"))
 #Model and configuration patterns for each sampler are located in a
 #seperate model file.
 
@@ -24,8 +28,10 @@ for (i,seed) in enumerate(seeds)
     @fetch @spawnat i Random.seed!(seed)
 end
 
-ProjDir = @__DIR__
-cd(ProjDir)
+stanSampler = CmdStanNUTS(CmdStanConfig,ProjDir)
+#Initialize model files for each instance of stan
+initStan(stanSampler)
+#Compile stan model
 
 samplers=(CmdStanNUTS(CmdStanConfig,ProjDir),
     AHMCNUTS(AHMC_SDT,AHMCconfig),
@@ -33,28 +39,30 @@ samplers=(CmdStanNUTS(CmdStanConfig,ProjDir),
     DHMCNUTS(sampleDHMC,2000))
 
 #Number of data points
-Nd = [10,100,1000]
+Nd = [10,50,100]
 
 #Number of simulations
 Nreps = 100
 
-options = (Nchains=Nchains,Nsamples=2000,Nadapt=1000,delta=.8,Nd=Nd)
-
+options = (Nsamples=2000,Nadapt=1000,delta=.8,Nd=Nd)
 #perform the benchmark
-results = benchmark(samplers,simulateSDT,Nreps;options...)
+results = pbenchmark(samplers,simulateSDT,Nreps;options...)
 
 #save results
 save(results,ProjDir)
 
-#pyplot()
-cd(pwd)
-dir = "results/"
+#Plot parameter recovery
+recoveryPlots = plotrecovery(results,(c=0,d=2),(:sampler,:Nd);save=true,dir=dir)
+
 #Plot mean run time as a function of number of data points (Nd) for each sampler
 meantimePlot = plotsummary(results,:Nd,:time,(:sampler,);save=true,dir=dir)
 
 #Plot mean allocations as a function of number of data points (Nd) for each sampler
 meanallocPlot = plotsummary(results,:Nd,:allocations,(:sampler,);save=true,dir=dir,yscale=:log10,
   ylabel="Allocations (log scale)")
+
+#Plot mean ess per second of number of data points (Nd) for each sampler
+meanallocPlot = plotsummary(results,:Nd,:ess_ps,(:sampler,);save=true,dir=dir)
 
 #Plot density of effective sample size as function of number of data points (Nd) for each sampler
 essPlots = plotdensity(results,:ess,(:sampler,:Nd);save=true,dir=dir)

@@ -5,8 +5,9 @@ using Reexport
 @reexport using Turing,MCMCBenchmarks,CmdStan,StatsPlots,Pkg
 @reexport using Statistics,DataFrames,Random,Parameters,DynamicHMC
 @reexport using LogDensityProblems,TransformVariables,Dates
-@reexport using AdvancedHMC, ForwardDiff,Distributed,CSV
+@reexport using AdvancedHMC,ForwardDiff,Distributed,CSV
 import Base: get
+import MCMCChains: Chains
 
 include("plotting.jl")
 include("Utilities.jl")
@@ -68,14 +69,16 @@ Primary function that performs mcmc benchmark repeatedly on a set of samplers
 and records the results.
 * 'sampler': tuple of sampler objects
 * `results`: DataFrame containing benchmark results
+* `csr̂`: cross sampler r̂
 * `simulate`: data generating function
 * `Nreps`: number of repetitions for a given set of simulation parameters. Default = 100
 * `kwargs`: optional keyword arguments that are passed to modifyConfig!, updateResults! and
 runSampler, providing flexibility in benchmark simulations.
 """
-function benchmark!(samplers,results,simulate,Nreps,chains;kwargs...)
+function benchmark!(samplers,results,csr̂,simulate,Nreps,chains;kwargs...)
     for rep in 1:Nreps
       data = simulate(;kwargs...)
+      schains = Chains[]
       for s in samplers
           modifyConfig!(s;kwargs...)
           println("\nSampler: $(typeof(s))")
@@ -83,15 +86,41 @@ function benchmark!(samplers,results,simulate,Nreps,chains;kwargs...)
           println("Repetition: $rep of $Nreps\n")
           foreach(x->println(x),kwargs)
           performance = @timed runSampler(s,data;kwargs...)
+          push!(schains,performance[1])
           allowmissing!(results)
           updateResults!(s,performance,results;kwargs...)
           savechain!(s,chains,performance;kwargs...)
       end
+      csr̂=cross_samplerRhat!(schains,csr̂;kwargs...)
     end
     return results
 end
 
-function benchmark!(sampler::T,results,simulate,Nreps,chains;kwargs...) where {T<:MCMCSampler}
+function Chains(chain::Chains)
+    parms = String.(chain.name_map.parameters)
+    sort!(parms)
+    v=chain[:,parms,:].value.data
+    return Chains(v,parms)
+end
+
+function cross_samplerRhat!(schains,csr̂;kwargs...)
+    schains = Chains.(schains)
+    chains = reduce(chainscat,schains)
+    chains = removeBurnin(chains;kwargs...)
+    df = describe(chains)[1].df
+    parms = sort!(chains.name_map.parameters)
+    values = getindex(df,:r_hat)
+    N = length(schains)
+    newDF = DataFrame()
+    for (p,v) in zip(parms,values)
+        colname = createName(p,:sampler_rhat)
+        V = fill(v,N)
+        setindex!(newDF,V,colname)
+    end
+    append!(csr̂,newDF)
+end
+
+function benchmark!(sampler::T,results,csr̂,simulate,Nreps,chains;kwargs...) where {T<:MCMCSampler}
     return benchmark!((sampler,),results,simulate,Nreps,chains;kwargs...)
 end
 
@@ -104,27 +133,40 @@ Runs the benchmarking procedure and returns the results
 """
  function benchmark(samplers,simulate,Nreps,chains=();kwargs...)
      results = DataFrame()
-     compile(samplers,simulate;kwargs...)
+     csr̂ = DataFrame()
      for p in Permutation(kwargs)
-         benchmark!(samplers,results,simulate,Nreps,chains;p...)
+         benchmark!(samplers,results,csr̂,simulate,Nreps,chains;p...)
      end
-     return results
+     return [results csr̂]
+ end
+
+ """
+ Runs the benchmarking procedure defined in benchmark in parallel and returns the results
+
+ * `samplers`: a tuple of samplers or a single sampler object
+ * `simulate`: model simulation function with keyword Nd
+ * `Nreps`: number of times the benchmark is repeated for each factor combination
+ """
+ function pbenchmark(samplers,simulate,Nreps;kwargs...)
+     compile(samplers,simulate;kwargs...)
+     pfun(rep) = benchmark(samplers,simulate,rep,chains;kwargs...)
+     reps = setreps(Nreps)
+     presults = pmap(rep->pfun(rep),reps)
+     return vcat(presults...)
  end
 
 """
 Extracts model and configuration from sampler object and performs
 parameter estimation
-* 's': sampler object
-* `data': data for benchmarking
+* `s`: sampler object
+* `data`: data for benchmarking
 """
-function runSampler(s::AHMCNUTS,data;Nchains,kwargs...)
-    chains = pmap(x->sample(s.model(data...),s.config),1:Nchains)
-    return reduce(chainscat,chains)
+function runSampler(s::AHMCNUTS,data;kwargs...)
+    return sample(s.model(data...),s.config)
 end
 
-function runSampler(s::DNNUTS,data;Nchains,kwargs...)
-    chains = pmap(x->sample(s.model(data...),s.config),1:Nchains)
-    return reduce(chainscat,chains)
+function runSampler(s::DNNUTS,data;kwargs...)
+    return sample(s.model(data...),s.config)
 end
 
 function runSampler(s::CmdStanNUTS,data;kwargs...)
@@ -132,9 +174,8 @@ function runSampler(s::CmdStanNUTS,data;kwargs...)
     return chns
 end
 
-function runSampler(s::DHMCNUTS,data;Nchains,kwargs...)
-    chains = pmap(x->s.model(data...,s.Nsamples),1:Nchains)
-    return reduce(chainscat,chains)
+function runSampler(s::DHMCNUTS,data;kwargs...)
+    return s.model(data...,s.Nsamples)
 end
 
 """
@@ -167,6 +208,7 @@ end
 function updateResults!(s::CmdStanNUTS,performance,results;kwargs...)
     chain = performance[1]
     newDF = DataFrame()
+    chain=removeBurnin(chain;kwargs...)
     df = describe(chain)[1].df
     addColumns!(newDF,chain,df,:ess)
     addColumns!(newDF,chain,df,:r_hat)
@@ -250,12 +292,10 @@ function modifyConfig!(s::AHMCNUTS;Nsamples,Nadapt,delta,kwargs...)
     s.config = Turing.NUTS(Nsamples,Nadapt,delta)
 end
 
-function modifyConfig!(s::CmdStanNUTS;Nchains,Nsamples,Nadapt,delta,kwargs...)
+function modifyConfig!(s::CmdStanNUTS;Nsamples,Nadapt,delta,kwargs...)
     s.model.num_samples = Nsamples-Nadapt
     s.model.num_warmup = Nadapt
     s.model.method.adapt.delta = delta
-    s.model.nchains = Nchains
-    s.model.command = fill(``, Nchains)
     id = myid()
     if id != 1
         s.model.name = string(s.name,id)
@@ -363,18 +403,6 @@ function initChains(s)
     return NamedTuple{names}(v)
 end
 
-function importModels(folder,models...)
-    for m in models
-        include(folder*"/"*m*".jl")
-    end
-end
-
-function importModels(folder)
-    files = readdir(folder)
-    filter!(x->occursin(".jl",x),x)
-    importModels(".jl",files...)
-end
-
 export
   modifyConfig!,
   addColumns!,
@@ -388,6 +416,7 @@ export
   runSampler,
   benchmark!,
   benchmark,
+  pbenchmark,
   MCMCSampler,
   AHMCNUTS,
   CmdStanNUTS,
@@ -402,5 +431,6 @@ export
   save,
   Permutation,
   initChains,
+  initStan
   getMetadata
 end # module
