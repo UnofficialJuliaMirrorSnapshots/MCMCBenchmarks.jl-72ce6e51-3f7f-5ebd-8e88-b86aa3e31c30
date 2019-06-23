@@ -1,68 +1,28 @@
-using MCMCBenchmarks,Distributed
-Nchains=4
-setprocs(Nchains)
+using MCMCBenchmarks,CSV
 
 ProjDir = @__DIR__
 cd(ProjDir)
 
-isdir("tmp") && rm("tmp", recursive=true)
-mkdir("tmp")
-!isdir("results") && mkdir("results")
-path = pathof(MCMCBenchmarks)
-@everywhere begin
-  using MCMCBenchmarks
-  #Model and configuration patterns for each sampler are located in a
-  #seperate model file.
-  include(joinpath($path, "../../Models/SDT/SDT.jl"))
-  include(joinpath($path, "../../Models/SDT/SDT_Functions.jl"))
-end
-include(joinpath(path, "../../Models/SDT/SDT.jl"))
-include(joinpath(path, "../../Models/SDT/SDT_Functions.jl"))
-#Model and configuration patterns for each sampler are located in a
-#seperate model file.
+path = joinpath(pathof(MCMCBenchmarks),"../../Examples/Linear_Regression/results/")
 
-@everywhere Turing.turnprogress(false)
-#set seeds on each processor
-seeds = (939388,39884,28484,495858,544443)
-for (i,seed) in enumerate(seeds)
-    @fetch @spawnat i Random.seed!(seed)
-end
+folder = "2019_06_15T14_20_00/"
+results = CSV.read(path*folder*"results.csv")
 
-stanSampler = CmdStanNUTS(CmdStanConfig,ProjDir)
-#Initialize model files for each instance of stan
-initStan(stanSampler)
-#Compile stan model
-
-samplers=(CmdStanNUTS(CmdStanConfig,ProjDir),
-    AHMCNUTS(AHMC_SDT,AHMCconfig),
-    #DNNUTS(DN_SDT,DNconfig)
-    DHMCNUTS(sampleDHMC,2000))
-
-#Number of data points
-Nd = [10,50,100]
-
-#Number of simulations
-Nreps = 100
-
-options = (Nsamples=2000,Nadapt=1000,delta=.8,Nd=Nd)
-#perform the benchmark
-results = pbenchmark(samplers,simulateSDT,Nreps;options...)
-
-#save results
-save(results,ProjDir)
+dir = "results/"
 
 #Plot parameter recovery
-recoveryPlots = plotrecovery(results,(c=0,d=2),(:sampler,:Nd);save=true,dir=dir)
+parms = Dict(:B0=>1,Symbol("B[1]")=>.5,Symbol("B[2]")=>.5,Symbol("B[3]")=>.5,:sigma=>1)
+recoveryPlots = plotrecovery(results,parms,(:sampler,:Nd);save=true,dir=dir)
 
 #Plot mean run time as a function of number of data points (Nd) for each sampler
 meantimePlot = plotsummary(results,:Nd,:time,(:sampler,);save=true,dir=dir,yscale=:log10)
 
 #Plot mean allocations as a function of number of data points (Nd) for each sampler
-meanallocPlot = plotsummary(results,:Nd,:allocations,(:sampler,);save=true,dir=dir,yscale=:log10,
+meanallocPlot = plotsummary(results,:Nd,:allocations,(:sampler,);save=false,dir=dir,yscale=:log10,
   ylabel="Allocations (log scale)")
 
 #Plot mean ess per second of number of data points (Nd) for each sampler
-meanallocPlot = plotsummary(results,:Nd,:ess_ps,(:sampler,);save=true,dir=dir)
+essPS = plotsummary(results,:Nd,:ess_ps,(:sampler,);save=true,dir=dir)
 
 #Plot density of effective sample size as function of number of data points (Nd) for each sampler
 essPlots = plotdensity(results,:ess,(:sampler,:Nd);save=true,dir=dir)

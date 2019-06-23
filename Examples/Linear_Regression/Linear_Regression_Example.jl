@@ -1,4 +1,4 @@
-using MCMCBenchmarks,Distributed
+using Revise,MCMCBenchmarks,Distributed
 Nchains=4
 setprocs(Nchains)
 
@@ -13,13 +13,13 @@ path = pathof(MCMCBenchmarks)
   using MCMCBenchmarks
   #Model and configuration patterns for each sampler are located in a
   #seperate model file.
-  include(joinpath($path, "../../Models/SDT/SDT.jl"))
-  include(joinpath($path, "../../Models/SDT/SDT_Functions.jl"))
+  include(joinpath($path,
+    "../../Models/Linear_Regression/Linear_Regression_Models.jl"))
 end
-include(joinpath(path, "../../Models/SDT/SDT.jl"))
-include(joinpath(path, "../../Models/SDT/SDT_Functions.jl"))
-#Model and configuration patterns for each sampler are located in a
-#seperate model file.
+
+#run this on primary processor to create tmp folder
+include(joinpath(path,
+  "../../Models/Linear_Regression/Linear_Regression_Models.jl"))
 
 @everywhere Turing.turnprogress(false)
 #set seeds on each processor
@@ -27,42 +27,55 @@ seeds = (939388,39884,28484,495858,544443)
 for (i,seed) in enumerate(seeds)
     @fetch @spawnat i Random.seed!(seed)
 end
+#create a sampler object or a tuple of sampler objects
+
+#Note that AHMC and DynamicNUTS do not work together due to an
+# error in MCMCChains: https://github.com/TuringLang/MCMCChains.jl/issues/101
+
+samplers=(
+  CmdStanNUTS(CmdStanConfig,ProjDir),
+  AHMCNUTS(AHMCregression,AHMCconfig),
+  DHMCNUTS(sampleDHMC,2000))
+  #DNNUTS(DNregression,DNconfig))
 
 stanSampler = CmdStanNUTS(CmdStanConfig,ProjDir)
 #Initialize model files for each instance of stan
 initStan(stanSampler)
-#Compile stan model
-
-samplers=(CmdStanNUTS(CmdStanConfig,ProjDir),
-    AHMCNUTS(AHMC_SDT,AHMCconfig),
-    #DNNUTS(DN_SDT,DNconfig)
-    DHMCNUTS(sampleDHMC,2000))
 
 #Number of data points
-Nd = [10,50,100]
+Nd = [10, 100, 1000]
+
+#Number of coefficients
+Nc = 3
 
 #Number of simulations
-Nreps = 100
+Nreps = 50
 
-options = (Nsamples=2000,Nadapt=1000,delta=.8,Nd=Nd)
+options = (Nsamples=2000,Nadapt=1000,delta=.8,Nd=Nd,Nc=Nc)
+
 #perform the benchmark
-results = pbenchmark(samplers,simulateSDT,Nreps;options...)
+results = pbenchmark(samplers,simulateRegression,Nreps;options...)
 
 #save results
 save(results,ProjDir)
 
+pyplot()
+cd(pwd)
+dir = "results/"
+
 #Plot parameter recovery
-recoveryPlots = plotrecovery(results,(c=0,d=2),(:sampler,:Nd);save=true,dir=dir)
+parms = Dict(:B0=>1,Symbol("B[1]")=>.5,Symbol("B[2]")=>.5,Symbol("B[3]")=>.5,:sigma=>1)
+recoveryPlots = plotrecovery(results,parms,(:sampler,:Nd);save=true,dir=dir)
 
 #Plot mean run time as a function of number of data points (Nd) for each sampler
 meantimePlot = plotsummary(results,:Nd,:time,(:sampler,);save=true,dir=dir,yscale=:log10)
 
 #Plot mean allocations as a function of number of data points (Nd) for each sampler
-meanallocPlot = plotsummary(results,:Nd,:allocations,(:sampler,);save=true,dir=dir,yscale=:log10,
+meanallocPlot = plotsummary(results,:Nd,:allocations,(:sampler,);save=false,dir=dir,yscale=:log10,
   ylabel="Allocations (log scale)")
 
 #Plot mean ess per second of number of data points (Nd) for each sampler
-meanallocPlot = plotsummary(results,:Nd,:ess_ps,(:sampler,);save=true,dir=dir)
+essPS = plotsummary(results,:Nd,:ess_ps,(:sampler,);save=true,dir=dir)
 
 #Plot density of effective sample size as function of number of data points (Nd) for each sampler
 essPlots = plotdensity(results,:ess,(:sampler,:Nd);save=true,dir=dir)
