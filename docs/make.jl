@@ -3,9 +3,9 @@ using Documenter, MCMCBenchmarks
 makedocs(
     modules = [MCMCBenchmarks],
     checkdocs = :exports,
-    authors = "Chris Fisher, Rob J Goedman",
+    authors = "Christopher R. Fisher, Rob J Goedman",
     sitename = "StatisticalRethinkingJulia/MCMCBenchmarks.jl",
-    pages = Any["index.md"]
+    pages = Any["index.md","functions.md","example.md","benchmarks.md"]
 )
 
 deploydocs(
