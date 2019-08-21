@@ -4,8 +4,8 @@ using Reexport
 
 @reexport using Turing,MCMCBenchmarks,CmdStan,StatsPlots,Pkg
 @reexport using Statistics,DataFrames,Random,Parameters,DynamicHMC
-@reexport using LogDensityProblems,TransformVariables,Dates
-@reexport using AdvancedHMC,ForwardDiff,Distributed,CSV
+@reexport using LogDensityProblems,TransformVariables,Dates,FillArrays
+@reexport using AdvancedHMC,ForwardDiff,Distributed,CSV,SpecialFunctions
 import Base: get
 import MCMCChains: Chains
 
