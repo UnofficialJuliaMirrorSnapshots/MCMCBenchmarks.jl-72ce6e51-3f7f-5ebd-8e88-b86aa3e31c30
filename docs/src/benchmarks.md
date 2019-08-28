@@ -36,13 +36,26 @@ options = (Nsamples=2000,Nadapt=1000,delta=.8,Nd=Nd)
 
 * speed
 
-![Gaussian_Speed](../Examples/Gaussian/results/summary_time.pdf)
+![summary_time](../../Examples/Gaussian/results/summary_time.pdf)
+
+```@raw html
+<img src="../../Examples/Gaussian/results/summary_time.pdf" width="500"/>
+```
+
+```@raw html
+<img src="../../Examples/Gaussian/results/plot.png" width="500"/>
+```
+![plot](../../Examples/Gaussian/results/plot.png)
 
 * allocations
 
-![Gaussian_Allocations(../Examples/Gaussian/results/summary_allocations.pdf)
+![Gaussian_Allocations](../../Examples/Gaussian/results/summary_allocations.pdf)
 
 * effective sample size
+
+![Gaussian_MuESS](../Examples/Gaussian/results/density_mu_ess.pdf)
+
+![Gaussian_SigmaESS](../../Examples/Gaussian/results/density_sigma_ess.pdf)
 
 ### Signal Detection Theory
 
@@ -61,7 +74,7 @@ c \sim Normal(0,1/\sqrt(2))
 \theta_{fas} = ϕ(-d/2-c)
 ```
 ```math
-n_{hits} \sim Normal(\mu,\theta_{hits})
+n_{hits} \sim Binomial(N,\theta_{hits})
 ```
 ```math
 n_{fas} \sim Binomial(N,\theta_{fas})
@@ -93,7 +106,7 @@ options = (Nsamples=2000,Nadapt=1000,delta=.8,Nd=Nd)
 ```
 ```math
 Y \sim Normal(\mu,\sigma)
-````
+```
 
 * benchmark design
 
@@ -140,7 +153,7 @@ f_c(t) = \frac{1}{A} \left[-v_c \Phi\left( \frac{b-A-tv_c}{ts} \right) + \phi\le
 + v_c \Phi\left( \frac{b-tv_c}{ts} \right) + s \phi\left( \frac{b-tv_c}{ts} \right) \right]
 ```
 ```math
-F_c(t) = 1 + \frac{b-A-tv_i}{A}  \Phi\left \frac{b-A-tv_c}{ts} \right) - \frac{b-tv_i}{A}  \Phi\left \frac{b-tv_c}{ts} \right) + \frac{ts}{A} \phi \left(\frac{b-A-tv_c}{ts} \right) - \frac{ts}{A} \phi \left(\frac{b-tv_c}{ts} \right)
+F_c(t) = 1 + \frac{b-A-tv_c}{A} \Phi\left(\frac{b-A-tv_c}{ts} \right) - \frac{b-tv_c}{A} \Phi\left( \frac{b-tv_c}{ts} \right) + \frac{ts}{A} \phi\left( \frac{b-A-tv_c}{ts} \right) - \frac{ts}{A} \phi\left( \frac{b-tv_c}{ts} \right)
 ```
 ```math
 Y = {y_1,...,y_n}
