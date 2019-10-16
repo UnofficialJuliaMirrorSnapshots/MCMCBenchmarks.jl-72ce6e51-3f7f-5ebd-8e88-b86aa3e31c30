@@ -1,6 +1,7 @@
-using MCMCBenchmarks,Test
+using MCMCBenchmarks, Test, Random
 
 @testset "Regression Tests " begin
+    Random.seed!(22385)
     path = pathof(MCMCBenchmarks)
     include(joinpath(path,
       "../../Models/Linear_Regression/Linear_Regression_Models.jl"))
@@ -14,10 +15,10 @@ using MCMCBenchmarks,Test
     samplers = (
       CmdStanNUTS(CmdStanConfig,ProjDir),
       AHMCNUTS(AHMCregression,AHMCconfig),
-      DHMCNUTS(sampleDHMC,2000))
-    options = (Nsamples=2000,Nadapt=1000,delta=.8,Nd=Nd)
-    results = benchmark(samplers,simulateRegression,Nreps;options...)
-    @test isa(results,DataFrame)
+      DHMCNUTS(sampleDHMC))
+    options = (Nsamples=2000, Nadapt=1000, delta=.8, Nd=Nd)
+    results = benchmark(samplers, simulateRegression, Nreps;options...)
+    @test isa(results, DataFrame)
     # @test results[!,Symbol("B[1]_mean")][results[!,:sampler] .== :AHMCNUTS,:][1] ≈ β[1] atol = .1
     # @test results[!,Symbol("B[1]_mean")][results[!,:sampler] .== :CmdStanNUTS,:][1] ≈ β[1] atol = .1
     # @test results[!,Symbol("B[1]_mean")][results[!,:sampler] .== :DHMCNUTS,:][1] ≈ β[1] atol = .1

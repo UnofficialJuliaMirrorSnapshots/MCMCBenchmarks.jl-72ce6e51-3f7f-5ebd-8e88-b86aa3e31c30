@@ -1,7 +1,7 @@
 name = "MCMCBenchmarks"
 uuid = "72ce6e51-3f7f-5ebd-8e88-b86aa3e31c30"
 authors = ["Christopher R. Fisher, Rob J. Goedman"]
-version = "0.5.1"
+version = "0.5.3"
 
 [deps]
 AdvancedHMC = "0bf59076-c3b1-5ca4-86bd-e02cd72cde3d"
@@ -27,12 +27,15 @@ Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
+Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
 TransformVariables = "84d833dd-6860-57f9-a1a7-6da5db126cff"
 Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
 
 [compat]
-julia = "^1"
+CmdStan = "^5"
 DynamicHMC = "^2"
+Turing = "^0.7"
+julia = "^1"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

@@ -32,7 +32,7 @@ end
 samplers=(
   CmdStanNUTS(CmdStanConfig, ProjDir),
   AHMCNUTS(AHMCGaussian, AHMCconfig),
-  DHMCNUTS(sampleDHMC, 2000),
+  DHMCNUTS(sampleDHMC),
 )
 
 stanSampler = CmdStanNUTS(CmdStanConfig, ProjDir)
@@ -41,7 +41,7 @@ stanSampler = CmdStanNUTS(CmdStanConfig, ProjDir)
 initStan(stanSampler)
 
 # Number of data points
-Nd = [10, 100, 1000,10_000]
+Nd = [10, 100, 1000, 10_000]
 
 # Number of simulations
 Nreps = 50

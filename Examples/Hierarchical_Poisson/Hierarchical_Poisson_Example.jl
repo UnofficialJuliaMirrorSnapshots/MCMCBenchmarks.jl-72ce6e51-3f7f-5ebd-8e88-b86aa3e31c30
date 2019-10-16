@@ -25,7 +25,7 @@ include(joinpath(path,
 
 @everywhere Turing.turnprogress(false)
 #set seeds on each processor
-seeds = (939388,39884,28484,495858,544443)
+seeds = (939388, 39884, 28484, 495858, 544443)
 for (i,seed) in enumerate(seeds)
     @fetch @spawnat i Random.seed!(seed)
 end
@@ -34,7 +34,7 @@ end
 samplers=(
   CmdStanNUTS(CmdStanConfig, ProjDir),
   AHMCNUTS(AHMCpoisson, AHMCconfig),
-  DHMCNUTS(sampleDHMC, 2000),
+  #DHMCNUTS(sampleDHMC),
 )
 
 stanSampler = CmdStanNUTS(CmdStanConfig, ProjDir)
@@ -60,4 +60,4 @@ results = pbenchmark(samplers, simulatePoisson, Nreps; options...)
 save(results, ProjDir)
 
 # Make plots
-include("plotting.jl")
+include("primary_plots.jl")

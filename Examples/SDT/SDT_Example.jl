@@ -1,5 +1,5 @@
 using MCMCBenchmarks,Distributed
-Nchains=4
+Nchains = 4
 setprocs(Nchains)
 
 ProjDir = @__DIR__
@@ -35,18 +35,18 @@ initStan(stanSampler)
 
 samplers=(CmdStanNUTS(CmdStanConfig,ProjDir),
     AHMCNUTS(AHMC_SDT,AHMCconfig),
-    DHMCNUTS(sampleDHMC,2000)
+    DHMCNUTS(sampleDHMC)
 )
 
 #Number of data points
-Nd = [10,100,1000]
+Nd = [10, 100, 1000, 10_000]
 
 #Number of simulations
 Nreps = 100
 
-options = (Nsamples=2000,Nadapt=1000,delta=.8,Nd=Nd)
+options = (Nsamples=2000, Nadapt=1000, delta=.8, Nd=Nd)
 #perform the benchmark
-results = pbenchmark(samplers,simulateSDT,Nreps;options...)
+results = pbenchmark(samplers, simulateSDT, Nreps; options...)
 
 #save results
 save(results,ProjDir)

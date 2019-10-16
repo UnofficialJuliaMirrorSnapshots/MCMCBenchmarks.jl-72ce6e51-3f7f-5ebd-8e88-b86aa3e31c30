@@ -1,6 +1,7 @@
-using MCMCBenchmarks,Test
+using MCMCBenchmarks, Test, Random
 
 @testset "SDT Tests " begin
+    Random.seed!(6505)
     path = pathof(MCMCBenchmarks)
     include(joinpath(path,"../../Models/SDT/SDT_Functions.jl"))
     include(joinpath(path,"../../Models/SDT/SDT.jl"))
@@ -10,11 +11,12 @@ using MCMCBenchmarks,Test
     Nreps = 1
     ProjDir = @__DIR__
     cd(ProjDir)
-    samplers=(CmdStanNUTS(CmdStanConfig,ProjDir),
-        AHMCNUTS(AHMC_SDT,AHMCconfig),
-        DHMCNUTS(sampleDHMC,2000))
-    options = (Nsamples=2000,Nadapt=1000,delta=.8,Nd=Nd)
-    results = benchmark(samplers,simulateSDT,Nreps;options...)
+    samplers=(CmdStanNUTS(CmdStanConfig, ProjDir),
+        AHMCNUTS(AHMC_SDT, AHMCconfig),
+        DHMCNUTS(sampleDHMC)
+        )
+    options = (Nsamples=2000, Nadapt=1000, delta=.8, Nd=Nd)
+    results = benchmark(samplers, simulateSDT, Nreps;options...)
     @test results[!,:d_mean][results[!,:sampler] .== :AHMCNUTS,:][1] ≈ d atol = .05
     @test results[!,:d_mean][results[!,:sampler] .== :CmdStanNUTS,:][1] ≈ d atol = .05
     @test results[!,:d_mean][results[!,:sampler] .== :DHMCNUTS,:][1] ≈ d atol = .05
