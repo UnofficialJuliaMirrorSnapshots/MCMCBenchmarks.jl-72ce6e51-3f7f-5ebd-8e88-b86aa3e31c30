@@ -174,19 +174,30 @@ function Chains(chain::Chains)
     return Chains(v,parms)
 end
 
+"""
+Run all benchmarks
+"""
 function run_all_benchmarks()
     path = pathof(MCMCBenchmarks)
     models = [
+        "Gaussian",
         "Hierarchial_Poisson",
         "LBA",
         "Linear_Regression",
         "SDT",
-        "Gaussian",
         "Autodiff",
     ]
     res = map(models) do m
         @eval module $(Symbol("Test_", m))
-            include(joinpath($path, "../../Models/"*$t * "_Example.jl"))
+            include(joinpath($path, "../../Examples/" * $m * "/" * $m * "_Example.jl"))
         end
     end
  end
+
+ function run_all_benchmarks(models)
+     res = map(models) do m
+         @eval module $(Symbol("Test_", m))
+             include($m)
+         end
+     end
+  end
